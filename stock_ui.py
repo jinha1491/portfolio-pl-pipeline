@@ -6,7 +6,7 @@ import yfinance as yf
 import requests
 
 st.set_page_config(page_title="Stock Entry", layout="wide")
-st.title("📈 Stock Portfolio Input with Accounts")
+st.title("Stock Portfolio Input with Accounts")
 
 CSV_FILE = "stocks.csv"
 
@@ -37,7 +37,7 @@ if st.button("Save"):
         total_from_accounts = sum(account_quantities)
 
         if total_from_accounts != total_qty:
-            st.error(f"⚠️ Total quantity mismatch: {total_from_accounts} from accounts ≠ {total_qty}")
+            st.error(f"Total quantity mismatch: {total_from_accounts} from accounts ≠ {total_qty}")
         else:
             df = pd.read_csv(CSV_FILE)
 
@@ -50,21 +50,21 @@ if st.button("Save"):
 
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             df.to_csv(CSV_FILE, index=False)
-            st.success("✅ Saved successfully!")
+            st.success("Saved successfully!")
 
 # Step 4: Show all saved data
-st.subheader("📋 All Entered Stocks")
+st.subheader("All Entered Stocks")
 df = pd.read_csv(CSV_FILE)
 st.dataframe(df)
 
 
-st.subheader("📈 Stock Price Trend Viewer")
+st.subheader("Stock Price Trend Viewer")
 
 # 심볼 선택 드롭다운
 df = pd.read_csv(CSV_FILE)
 symbols = df["Symbol"].unique()
 
-selected_symbol = st.selectbox("📌 Choose a stock symbol to view its daily trend:", symbols)
+selected_symbol = st.selectbox("Choose a stock symbol to view its daily trend:", symbols)
 
 if selected_symbol:
     # yfinance에서 데이터 불러오기
@@ -99,10 +99,10 @@ def get_usd_to_krw():
 
 exchange_rate = get_usd_to_krw()
 if exchange_rate:
-    st.success(f"💵 Current Exchange Rate: 1 USD = {exchange_rate:,.2f} KRW")
+    st.success(f"Current Exchange Rate: 1 USD = {exchange_rate:,.2f} KRW")
 
     # Step 6: Show converted stock values
-    st.subheader("💹 Converted Stock Values")
+    st.subheader("Converted Stock Values")
     price_data = []
 
     for _, row in df.iterrows():
@@ -130,13 +130,13 @@ if exchange_rate:
     st.dataframe(result_df)
 
     # Step 7: Portfolio Pie Chart
-st.subheader("🥧 Stock Portfolio Distribution (by USD Value)")
+st.subheader("Stock Portfolio Distribution (by USD Value)")
 
 if not result_df.empty:
     chart_data = result_df[["Stock Name", "Amount (USD)"]]
     chart_data = chart_data.set_index("Stock Name")
 
-    st.write("💡 Based on today's prices in USD:")
+    st.write("Based on today's prices in USD:")
     st.pyplot(chart_data.plot.pie(
         y="Amount (USD)",
         autopct="%.1f%%",
