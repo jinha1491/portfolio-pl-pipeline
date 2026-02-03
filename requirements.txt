@@ -3,3 +3,4 @@ pandas
 sqlite3
 yfinance
 openpyxl
+
