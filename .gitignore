@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Streamlit
+.streamlit/
+
+# Local database
+portfolio.db
+
+# OS files
+.DS_Store
