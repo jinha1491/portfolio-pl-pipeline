@@ -1,4 +1,4 @@
-# Stock Portfolio Dashboard
+# Stock Portfolio Analytics Dashboard
 
 An interactive Streamlit dashboard for portfolio tracking and analysis.  
 The app imports holdings and transaction history from Excel, stores data in SQLite, and computes FIFO-based realized profit/loss in USD.
