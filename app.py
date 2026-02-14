@@ -121,6 +121,16 @@ def fetch_df(query, params=()):
     return df
 
 init_db()
+stats = fetch_df("""
+SELECT
+  (SELECT COUNT(*) FROM transactions) AS transactions,
+  (SELECT COUNT(*) FROM holdings) AS holdings,
+  (SELECT COUNT(*) FROM lots) AS lots,
+  (SELECT COUNT(*) FROM matches) AS matches
+""")
+
+st.write("Database Stats:")
+st.dataframe(stats)
 
 # ============================================================
 # 2) FIFO realized P/L logic
