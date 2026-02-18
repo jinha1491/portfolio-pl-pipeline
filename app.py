@@ -6,7 +6,7 @@ import yfinance as yf
 import json
 import re
 
-# Local SQLite database file (created automatically if it doesn't exist)
+# Local SQLite database file 
 DB_FILE = "portfolio.db"
 
 st.set_page_config(page_title="Portfolio (USD) + FIFO Realized P/L", layout="wide")
@@ -178,7 +178,7 @@ def fifo_match_sell_for_rebuild(
     remaining_to_sell = float(sell_qty)
     total_matched = 0.0
 
-    # We'll compute the allocation first, then write it (safer than writing mid-loop)
+    # compute the allocation first, then write it
     staged = []  # (lot_id, buy_date, buy_price, matched_qty, lot_remaining_after)
 
     for _, lot in lots_df.iterrows():
@@ -196,7 +196,7 @@ def fifo_match_sell_for_rebuild(
         remaining_to_sell -= match_qty
         total_matched += match_qty
 
-    # If you try to sell more shares than you have in lots, we throw an error
+    # If trying to sell more shares than having in lots, throw an error
     if remaining_to_sell > 1e-9:
         raise ValueError(
             f"Not enough shares to sell for FIFO: person={person}, symbol={symbol}. "
@@ -276,8 +276,8 @@ def rebuild_fifo():
 
 # ============================================================
 # 3) Transaction insert (ledger only)
-#    We do NOT update lots/matches here.
-#    We rebuild FIFO later so the logic is consistent and reproducible.
+#    do NOT update lots/matches here.
+#    rebuild FIFO later so the logic is consistent and reproducible.
 # ============================================================
 
 def add_transaction(person, symbol, stock_name, side, trade_date, quantity, price, fees):
@@ -309,7 +309,7 @@ def add_transaction(person, symbol, stock_name, side, trade_date, quantity, pric
 
 # ============================================================
 # 4) Excel imports
-#    We accept Excel because a lot of portfolio tracking starts in spreadsheets.
+#    Accept Excel because a lot of portfolio tracking starts in spreadsheets.
 #    Holdings import stores "what you own now".
 #    Transactions import stores "what trades happened".
 # ============================================================
@@ -521,7 +521,7 @@ def import_transactions_from_excel(file, sheet_name="Sheet2"):
 
 # ============================================================
 # 5) Symbol backfill
-#    If a transaction row only has Stock Name, we can map it to a symbol
+#    If a transaction row only has Stock Name, map it to a symbol
 #    using the holdings table (Stock Name -> symbol).
 # ============================================================
 
@@ -554,7 +554,7 @@ def backfill_symbols_from_holdings():
 
 # ============================================================
 # 6) Pricing (USD)
-#    We use yfinance to pull latest close and show a 1-month trend.
+#    Use yfinance to pull latest close and show a 1-month trend.
 # ============================================================
 
 @st.cache_data(ttl=60 * 30)
@@ -686,7 +686,7 @@ if not holdings_df.empty:
 
     port = pd.DataFrame(rows)
 
-    # Weight is useful for basic portfolio analytics (feature engineering type metric)
+    # Weight is useful for basic portfolio analytics 
     port["Weight (%)"] = port["Amount (USD)"].apply(
         lambda x: round((x / total_usd) * 100, 2) if total_usd > 0 else 0.0
     )
