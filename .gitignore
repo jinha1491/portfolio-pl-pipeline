@@ -12,3 +12,4 @@ portfolio.db
 # OS files
 .DS_Store
 .airflow/
+data/

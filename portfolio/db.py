@@ -78,6 +78,14 @@ CREATE TABLE IF NOT EXISTS portfolio_snapshots (
     PRIMARY KEY (snapshot_date, symbol)
 );
 
+CREATE TABLE IF NOT EXISTS ingested_files (
+    file_hash TEXT PRIMARY KEY,
+    file_name TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('holdings','transactions')),
+    rows_loaded INTEGER NOT NULL,
+    ingested_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_txn_main ON transactions(person, symbol, trade_date);
 CREATE INDEX IF NOT EXISTS idx_lots_main ON lots(person, symbol, buy_date);
 CREATE INDEX IF NOT EXISTS idx_matches_main ON matches(person, symbol, sell_date);

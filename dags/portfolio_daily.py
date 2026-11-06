@@ -5,7 +5,7 @@ from airflow.sdk import dag, get_current_context, task
 from airflow.sdk.exceptions import AirflowSkipException
 
 from portfolio import prices, quality
-from portfolio.db import init_db
+from portfolio.ingest import process_inbox
 from portfolio.fifo import rebuild_fifo
 
 
@@ -27,9 +27,18 @@ def run_day():
 )
 def portfolio_daily():
 
+    @task(retries=0)
+    def ingest_files():
+        result = process_inbox()
+        for name, kind, status, n in result["files"]:
+            print(f"{kind}/{name}: {status} ({n} rows)")
+        print(f"symbols backfilled: {result['symbols_backfilled']}")
+        if result["failed"]:
+            raise ValueError(f"Moved to data/failed/: {result['failed']}")
+        return len(result["files"])
+
     @task
     def extract_prices():
-        init_db()
         day = run_day()
         closes = prices.extract_closes(day)
         if closes is None:
@@ -56,8 +65,15 @@ def portfolio_daily():
     def validate_outputs():
         quality.enforce(quality.output_checks(run_day()))
 
-    loaded = load_prices(extract_prices())
-    loaded >> validate_prices() >> rebuild_lots() >> snapshot() >> validate_outputs()
+    ingested = ingest_files()
+    closes = extract_prices()
+    prices_ok = validate_prices()
+    lots = rebuild_lots()
+
+    ingested >> closes
+    load_prices(closes) >> prices_ok
+    ingested >> lots
+    [prices_ok, lots] >> snapshot() >> validate_outputs()
 
 
 portfolio_daily()
