@@ -3,18 +3,10 @@ import datetime as dt
 import yfinance as yf
 
 from portfolio.db import connect
+from portfolio.positions import POSITIONS_AS_OF, held_symbols
 
 # If SPY has no bar for a day, the market was closed (weekend or holiday).
 MARKET_PROXY = "SPY"
-
-
-def held_symbols():
-    c = connect()
-    rows = c.execute(
-        "SELECT symbol FROM holdings WHERE total_quantity > 0 ORDER BY symbol"
-    ).fetchall()
-    c.close()
-    return [r[0] for r in rows]
 
 
 def fetch_close(symbol, day):
@@ -31,13 +23,13 @@ def fetch_close(symbol, day):
 
 def extract_closes(day):
     """
-    Returns {symbol: close} for every held symbol, or None if the market was closed.
+    Returns {symbol: close} for every symbol held on that day, or None if the market was closed.
     Raises if the market was open but some symbols came back empty, so the task retries.
     """
     if fetch_close(MARKET_PROXY, day) is None:
         return None
 
-    symbols = held_symbols()
+    symbols = held_symbols(day)
     closes = {}
     for sym in symbols:
         px = fetch_close(sym, day)
@@ -71,20 +63,18 @@ def load_closes(day, closes):
 
 
 def snapshot_portfolio(day):
-    """Replace one day's portfolio snapshot: delete that date, then insert it fresh."""
-    d = day.isoformat()
+    """Replace one day's snapshot with positions as of that day, valued at that day's close."""
     c = connect()
     with c:
-        c.execute("DELETE FROM portfolio_snapshots WHERE snapshot_date = ?", (d,))
+        c.execute("DELETE FROM portfolio_snapshots WHERE snapshot_date = :day", {"day": day.isoformat()})
         cur = c.execute(
-            """
-            INSERT INTO portfolio_snapshots (snapshot_date, symbol, quantity, close, market_value)
-            SELECT ?, h.symbol, h.total_quantity, p.close, h.total_quantity * p.close
-            FROM holdings h
-            JOIN daily_prices p ON p.symbol = h.symbol AND p.price_date = ?
-            WHERE h.total_quantity > 0
+            f"""
+            INSERT INTO portfolio_snapshots (snapshot_date, person, symbol, quantity, close, market_value)
+            SELECT :day, pos.person, pos.symbol, pos.quantity, p.close, pos.quantity * p.close
+            FROM ({POSITIONS_AS_OF}) AS pos
+            JOIN daily_prices p ON p.symbol = pos.symbol AND p.price_date = :day
             """,
-            (d, d),
+            {"day": day.isoformat()},
         )
         n = cur.rowcount
     c.close()

@@ -88,6 +88,25 @@ if st.button("Rebuild FIFO lots and matches"):
 # 8) Views (what the app shows)
 # ============================================================
 
+st.subheader("Portfolio Value Over Time (USD)")
+history = fetch_df("""
+    SELECT snapshot_date, person, SUM(market_value) AS value
+    FROM portfolio_snapshots
+    GROUP BY snapshot_date, person
+    ORDER BY snapshot_date
+""")
+if history.empty:
+    st.info("No snapshots yet. Run the Airflow pipeline or a backfill to build history.")
+else:
+    by_person = history.pivot(index="snapshot_date", columns="person", values="value").fillna(0)
+    by_person["Total"] = by_person.sum(axis=1)
+    by_person.index = pd.to_datetime(by_person.index)
+    st.line_chart(by_person)
+    st.caption(
+        f"{len(by_person)} trading days, last snapshot {by_person.index[-1].date()}: "
+        f"${by_person['Total'].iloc[-1]:,.2f}"
+    )
+
 st.subheader("Holdings (from Excel)")
 holdings_df = fetch_df("""
     SELECT stock_name AS "Stock Name",
@@ -102,7 +121,7 @@ holdings_df = fetch_df("""
 if not holdings_df.empty:
     holdings_df["Account Quantities"] = holdings_df["Account Quantities"].apply(lambda x: json.loads(x))
 
-st.dataframe(holdings_df, use_container_width=True)
+st.dataframe(holdings_df, width="stretch")
 
 st.subheader("Portfolio Value (USD)")
 
@@ -134,20 +153,23 @@ if not holdings_df.empty:
         lambda x: round((x / total_usd) * 100, 2) if total_usd > 0 else 0.0
     )
 
-    st.dataframe(port.sort_values("Amount (USD)", ascending=False), use_container_width=True)
+    st.dataframe(port.sort_values("Amount (USD)", ascending=False), width="stretch")
     st.write(f"Total Portfolio Value (USD): ${total_usd:,.2f}")
 
     st.subheader("Portfolio Distribution (USD)")
-    chart_data = port.set_index("Stock Name")[["Amount (USD)"]]
-    st.pyplot(
-        chart_data.plot.pie(
-            y="Amount (USD)",
-            autopct="%.1f%%",
-            figsize=(5, 5),
-            legend=False,
-            ylabel=""
-        ).figure
-    )
+    if total_usd > 0:
+        chart_data = port.set_index("Stock Name")[["Amount (USD)"]]
+        st.pyplot(
+            chart_data.plot.pie(
+                y="Amount (USD)",
+                autopct="%.1f%%",
+                figsize=(5, 5),
+                legend=False,
+                ylabel=""
+            ).figure
+        )
+    else:
+        st.warning("Live prices unavailable right now, so the distribution chart is hidden.")
 else:
     st.info("No holdings imported yet.")
 
@@ -165,7 +187,7 @@ tx = fetch_df("""
     FROM transactions
     ORDER BY trade_date DESC, id DESC
 """)
-st.dataframe(tx, use_container_width=True)
+st.dataframe(tx, width="stretch")
 
 st.subheader("Realized P/L Summary (USD)")
 real_sum = fetch_df("""
@@ -178,7 +200,7 @@ real_sum = fetch_df("""
     GROUP BY person, symbol, term
     ORDER BY person, symbol, term
 """)
-st.dataframe(real_sum, use_container_width=True)
+st.dataframe(real_sum, width="stretch")
 
 st.subheader("Realized P/L Details (FIFO matches)")
 real_det = fetch_df("""
@@ -194,7 +216,7 @@ real_det = fetch_df("""
     FROM matches
     ORDER BY sell_date DESC, id DESC
 """)
-st.dataframe(real_det, use_container_width=True)
+st.dataframe(real_det, width="stretch")
 
 st.subheader("Price Trend Viewer (Last 1 Month)")
 symbols = sorted(holdings_df["Symbol"].unique().tolist()) if not holdings_df.empty else []

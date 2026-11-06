@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from portfolio.db import connect
+from portfolio.positions import POSITIONS_AS_OF
 
 
 @dataclass
@@ -24,13 +25,13 @@ def _rows(query, params=()):
 
 def check_prices_present(day):
     missing = _rows(
-        """
-        SELECT h.symbol
-        FROM holdings h
-        LEFT JOIN daily_prices p ON p.symbol = h.symbol AND p.price_date = ?
-        WHERE h.total_quantity > 0 AND p.symbol IS NULL
+        f"""
+        SELECT DISTINCT pos.symbol
+        FROM ({POSITIONS_AS_OF}) AS pos
+        LEFT JOIN daily_prices p ON p.symbol = pos.symbol AND p.price_date = :day
+        WHERE p.symbol IS NULL
         """,
-        (day.isoformat(),),
+        {"day": day.isoformat()},
     )
     return CheckResult(
         "prices_present", "error", not missing,
@@ -61,17 +62,19 @@ def check_price_moves(day, threshold=0.5):
 
 
 def check_snapshot_complete(day):
-    held, snapped = _rows(
-        """
+    """Every open position has a snapshot row. An empty ledger fails, since that means nothing was loaded."""
+    trades, held, snapped = _rows(
+        f"""
         SELECT
-          (SELECT COUNT(*) FROM holdings WHERE total_quantity > 0),
-          (SELECT COUNT(*) FROM portfolio_snapshots WHERE snapshot_date = ?)
+          (SELECT COUNT(*) FROM transactions),
+          (SELECT COUNT(*) FROM ({POSITIONS_AS_OF})),
+          (SELECT COUNT(*) FROM portfolio_snapshots WHERE snapshot_date = :day)
         """,
-        (day.isoformat(),),
+        {"day": day.isoformat()},
     )[0]
     return CheckResult(
-        "snapshot_complete", "error", held > 0 and held == snapped,
-        f"{snapped} of {held} holdings in snapshot",
+        "snapshot_complete", "error", trades > 0 and held == snapped,
+        f"{snapped} of {held} open positions in snapshot" if trades else "ledger is empty",
     )
 
 

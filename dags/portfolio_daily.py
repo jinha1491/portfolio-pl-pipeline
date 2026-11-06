@@ -19,7 +19,7 @@ def run_day():
 @dag(
     dag_id="portfolio_daily",
     schedule="30 17 * * 1-5",
-    start_date=pendulum.datetime(2026, 11, 2, tz="America/New_York"),
+    start_date=pendulum.datetime(2024, 1, 1, tz="America/New_York"),
     catchup=False,
     max_active_runs=1,
     default_args={"retries": 2, "retry_delay": timedelta(minutes=5)},

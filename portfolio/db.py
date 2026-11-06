@@ -71,11 +71,12 @@ CREATE TABLE IF NOT EXISTS daily_prices (
 
 CREATE TABLE IF NOT EXISTS portfolio_snapshots (
     snapshot_date TEXT NOT NULL,
+    person TEXT NOT NULL,
     symbol TEXT NOT NULL,
     quantity REAL NOT NULL,
     close REAL NOT NULL,
     market_value REAL NOT NULL,
-    PRIMARY KEY (snapshot_date, symbol)
+    PRIMARY KEY (snapshot_date, person, symbol)
 );
 
 CREATE TABLE IF NOT EXISTS ingested_files (
