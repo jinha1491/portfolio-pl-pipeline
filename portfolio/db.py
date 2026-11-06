@@ -61,6 +61,23 @@ CREATE TABLE IF NOT EXISTS matches (
     FOREIGN KEY(buy_lot_id) REFERENCES lots(id)
 );
 
+CREATE TABLE IF NOT EXISTS daily_prices (
+    symbol TEXT NOT NULL,
+    price_date TEXT NOT NULL,
+    close REAL NOT NULL CHECK(close > 0),
+    loaded_at TEXT NOT NULL,
+    PRIMARY KEY (symbol, price_date)
+);
+
+CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+    snapshot_date TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    close REAL NOT NULL,
+    market_value REAL NOT NULL,
+    PRIMARY KEY (snapshot_date, symbol)
+);
+
 CREATE INDEX IF NOT EXISTS idx_txn_main ON transactions(person, symbol, trade_date);
 CREATE INDEX IF NOT EXISTS idx_lots_main ON lots(person, symbol, buy_date);
 CREATE INDEX IF NOT EXISTS idx_matches_main ON matches(person, symbol, sell_date);
