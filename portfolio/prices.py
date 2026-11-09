@@ -44,14 +44,14 @@ def extract_closes(day):
 
 def load_closes(day, closes):
     """Upsert closes for one day. Running it twice for the same day leaves the same rows."""
-    now = dt.datetime.now(dt.timezone.utc).isoformat()
-    rows = [(sym, day.isoformat(), px, now) for sym, px in closes.items()]
+    now = dt.datetime.now(dt.timezone.utc)
+    rows = [(sym, day, px, now) for sym, px in closes.items()]
     c = connect()
     with c:
-        c.executemany(
+        c.cursor().executemany(
             """
             INSERT INTO daily_prices (symbol, price_date, close, loaded_at)
-            VALUES (?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s)
             ON CONFLICT(symbol, price_date) DO UPDATE SET
                 close = excluded.close,
                 loaded_at = excluded.loaded_at
@@ -66,15 +66,15 @@ def snapshot_portfolio(day):
     """Replace one day's snapshot with positions as of that day, valued at that day's close."""
     c = connect()
     with c:
-        c.execute("DELETE FROM portfolio_snapshots WHERE snapshot_date = :day", {"day": day.isoformat()})
+        c.execute("DELETE FROM portfolio_snapshots WHERE snapshot_date = %(day)s", {"day": day})
         cur = c.execute(
             f"""
             INSERT INTO portfolio_snapshots (snapshot_date, person, symbol, quantity, close, market_value)
-            SELECT :day, pos.person, pos.symbol, pos.quantity, p.close, pos.quantity * p.close
+            SELECT %(day)s, pos.person, pos.symbol, pos.quantity, p.close, pos.quantity * p.close
             FROM ({POSITIONS_AS_OF}) AS pos
-            JOIN daily_prices p ON p.symbol = pos.symbol AND p.price_date = :day
+            JOIN daily_prices p ON p.symbol = pos.symbol AND p.price_date = %(day)s
             """,
-            {"day": day.isoformat()},
+            {"day": day},
         )
         n = cur.rowcount
     c.close()

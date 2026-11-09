@@ -1,7 +1,16 @@
 README.md
 pyproject.toml
 portfolio/__init__.py
+portfolio/db.py
+portfolio/fifo.py
+portfolio/ingest.py
+portfolio/positions.py
+portfolio/prices.py
+portfolio/quality.py
 portfolio.egg-info/PKG-INFO
 portfolio.egg-info/SOURCES.txt
 portfolio.egg-info/dependency_links.txt
 portfolio.egg-info/top_level.txt
+tests/test_fifo.py
+tests/test_ingest.py
+tests/test_pipeline.py

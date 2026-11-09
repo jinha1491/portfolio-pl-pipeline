@@ -1,12 +1,12 @@
 import datetime as dt
 import hashlib
-import json
 import os
 import re
 import shutil
 from pathlib import Path
 
 import pandas as pd
+from psycopg.types.json import Jsonb
 
 from portfolio.db import connect, init_db
 
@@ -24,7 +24,7 @@ DEFAULT_SHEETS = {"holdings": "details", "transactions": "Sheet2"}
 
 
 def _now():
-    return dt.datetime.now(dt.timezone.utc).isoformat()
+    return dt.datetime.now(dt.timezone.utc)
 
 
 def file_hash(path):
@@ -49,17 +49,17 @@ def _is_blank(x):
     return x is None or (isinstance(x, float) and pd.isna(x)) or (isinstance(x, str) and x.strip() == "")
 
 
-def _to_date_str(x):
+def _to_date(x):
     """Excel dates arrive as datetimes or as strings like 2025-05-14 or 2025.05.14."""
     if isinstance(x, dt.datetime):
-        return x.date().isoformat()
+        return x.date()
     if isinstance(x, dt.date):
-        return x.isoformat()
+        return x
     s = str(x).strip().replace(".", "-")
     if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
-        return s
+        return dt.date.fromisoformat(s)
     try:
-        return pd.to_datetime(s).date().isoformat()
+        return pd.to_datetime(s).date()
     except Exception:
         raise ValueError(f"Unrecognized date value: {x}")
 
@@ -90,7 +90,7 @@ def parse_holdings(path):
             str(r["Stock Name"]).strip(),
             str(r["symbol"]).strip().upper(),
             float(qty) if pd.notna(qty) else 0.0,
-            json.dumps([float(r[c]) if pd.notna(r[c]) else 0.0 for c in account_cols]),
+            [float(r[c]) if pd.notna(r[c]) else 0.0 for c in account_cols],
         ))
     return rows
 
@@ -116,7 +116,7 @@ def _read_trade_block(raw, start, header, side, person):
             None if _is_blank(sym) else str(sym).strip().upper(),
             str(raw.iat[j, col_stock]).strip(),
             side,
-            _to_date_str(raw.iat[j, col_date]),
+            _to_date(raw.iat[j, col_date]),
             float(raw.iat[j, col_qty]),
             float(raw.iat[j, col_price]),
             float(fees) if pd.notna(fees) else 0.0,
@@ -162,27 +162,27 @@ def parse_transactions(path):
 
 def _load_holdings(c, rows):
     now = _now()
-    c.executemany(
+    c.cursor().executemany(
         """
         INSERT INTO holdings (stock_name, symbol, total_quantity, account_quantities, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
         ON CONFLICT(symbol) DO UPDATE SET
             stock_name = excluded.stock_name,
             total_quantity = excluded.total_quantity,
             account_quantities = excluded.account_quantities,
             updated_at = excluded.updated_at
         """,
-        [r + (now,) for r in rows],
+        [(name, sym, qty, Jsonb(accounts), now) for name, sym, qty, accounts in rows],
     )
 
 
 def _load_transactions(c, rows):
     now = _now()
-    c.executemany(
+    c.cursor().executemany(
         """
         INSERT INTO transactions
         (person, symbol, stock_name, side, trade_date, quantity, price, fees, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         [r + (now,) for r in rows],
     )
@@ -201,14 +201,14 @@ def ingest_file(path, kind):
     c = connect()
     try:
         with c:
-            if c.execute("SELECT 1 FROM ingested_files WHERE file_hash = ?", (digest,)).fetchone():
+            if c.execute("SELECT 1 FROM ingested_files WHERE file_hash = %s", (digest,)).fetchone():
                 return "duplicate", 0
             rows = PARSERS[kind](path)
             LOADERS[kind](c, rows)
             c.execute(
                 """
                 INSERT INTO ingested_files (file_hash, file_name, kind, rows_loaded, ingested_at)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
                 """,
                 (digest, path.name, kind, len(rows), _now()),
             )

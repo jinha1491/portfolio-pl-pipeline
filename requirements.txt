@@ -2,5 +2,6 @@ streamlit
 pandas
 yfinance
 openpyxl
+psycopg[binary]
 
 matplotlib

@@ -119,7 +119,8 @@ holdings_df = fetch_df("""
 """)
 
 if not holdings_df.empty:
-    holdings_df["Account Quantities"] = holdings_df["Account Quantities"].apply(lambda x: json.loads(x))
+    holdings_df["Account Quantities"] = holdings_df["Account Quantities"].apply(
+        lambda x: x if isinstance(x, list) else json.loads(x))
 
 st.dataframe(holdings_df, width="stretch")
 
@@ -194,8 +195,8 @@ real_sum = fetch_df("""
     SELECT person,
            symbol,
            term,
-           ROUND(SUM(realized_pl), 2) AS realized_pl_usd,
-           ROUND(SUM(matched_qty), 4) AS matched_qty
+           ROUND(SUM(realized_pl)::numeric, 2) AS realized_pl_usd,
+           ROUND(SUM(matched_qty)::numeric, 4) AS matched_qty
     FROM matches
     GROUP BY person, symbol, term
     ORDER BY person, symbol, term
@@ -208,11 +209,11 @@ real_det = fetch_df("""
            buy_date,
            person,
            symbol,
-           ROUND(matched_qty, 4) AS matched_qty,
-           ROUND(buy_price, 4) AS buy_price,
-           ROUND(sell_price, 4) AS sell_price,
+           ROUND(matched_qty::numeric, 4) AS matched_qty,
+           ROUND(buy_price::numeric, 4) AS buy_price,
+           ROUND(sell_price::numeric, 4) AS sell_price,
            term,
-           ROUND(realized_pl, 2) AS realized_pl_usd
+           ROUND(realized_pl::numeric, 2) AS realized_pl_usd
     FROM matches
     ORDER BY sell_date DESC, id DESC
 """)

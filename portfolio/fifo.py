@@ -5,9 +5,13 @@ from portfolio.db import connect
 EPS = 1e-9
 
 
-def term_class(buy_date: str, sell_date: str) -> str:
+def _as_date(d):
+    return d if isinstance(d, dt.date) else dt.date.fromisoformat(d)
+
+
+def term_class(buy_date, sell_date) -> str:
     """365+ days held is long-term, otherwise short-term."""
-    days = (dt.date.fromisoformat(sell_date) - dt.date.fromisoformat(buy_date)).days
+    days = (_as_date(sell_date) - _as_date(buy_date)).days
     return "LONG" if days >= 365 else "SHORT"
 
 
@@ -17,7 +21,7 @@ def _match_sell(cur, sell_txn_id, person, symbol, sell_date, sell_qty, sell_pric
         """
         SELECT id, buy_date, buy_price, remaining_qty
         FROM lots
-        WHERE person = ? AND symbol = ? AND remaining_qty > ?
+        WHERE person = %s AND symbol = %s AND remaining_qty > %s
         ORDER BY buy_date ASC, id ASC
         """,
         (person, symbol, EPS),
@@ -46,12 +50,12 @@ def _match_sell(cur, sell_txn_id, person, symbol, sell_date, sell_qty, sell_pric
             INSERT INTO matches
             (sell_txn_id, buy_lot_id, person, symbol, buy_date, sell_date,
              matched_qty, buy_price, sell_price, realized_pl, term)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (sell_txn_id, lot_id, person, symbol, buy_date, sell_date,
              take, buy_price, sell_price, realized, term_class(buy_date, sell_date)),
         )
-        cur.execute("UPDATE lots SET remaining_qty = ? WHERE id = ?", (lot_rem_after, lot_id))
+        cur.execute("UPDATE lots SET remaining_qty = %s WHERE id = %s", (lot_rem_after, lot_id))
 
 
 def rebuild_fifo():
@@ -80,7 +84,7 @@ def rebuild_fifo():
                     cur.execute(
                         """
                         INSERT INTO lots (buy_txn_id, person, symbol, buy_date, buy_price, remaining_qty)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        VALUES (%s, %s, %s, %s, %s, %s)
                         """,
                         (tx_id, person, symbol, trade_date, price, qty),
                     )

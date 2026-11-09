@@ -3,3 +3,4 @@ export AIRFLOW__CORE__DAGS_FOLDER="$PWD/dags"
 export AIRFLOW__CORE__LOAD_EXAMPLES=False
 export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
 export NO_PROXY="*"
+export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/portfolio"

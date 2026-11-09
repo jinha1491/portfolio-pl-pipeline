@@ -7,7 +7,7 @@ POSITIONS_AS_OF = """
            UPPER(TRIM(symbol)) AS symbol,
            SUM(CASE side WHEN 'BUY' THEN quantity ELSE -quantity END) AS quantity
     FROM transactions
-    WHERE symbol IS NOT NULL AND TRIM(symbol) <> '' AND trade_date <= :day
+    WHERE symbol IS NOT NULL AND TRIM(symbol) <> '' AND trade_date <= %(day)s
     GROUP BY TRIM(person), UPPER(TRIM(symbol))
     HAVING SUM(CASE side WHEN 'BUY' THEN quantity ELSE -quantity END) > 1e-9
 """
@@ -15,9 +15,8 @@ POSITIONS_AS_OF = """
 
 def open_positions(day):
     c = connect()
-    rows = c.execute(POSITIONS_AS_OF, {"day": day.isoformat()}).fetchall()
-    c.close()
-    return rows
+    with c:
+        return c.execute(POSITIONS_AS_OF, {"day": day}).fetchall()
 
 
 def held_symbols(day):

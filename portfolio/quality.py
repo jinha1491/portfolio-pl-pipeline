@@ -16,11 +16,9 @@ class DataQualityError(Exception):
     pass
 
 
-def _rows(query, params=()):
-    c = connect()
-    rows = c.execute(query, params).fetchall()
-    c.close()
-    return rows
+def _rows(query, params=None):
+    with connect() as c:
+        return c.execute(query, params).fetchall()
 
 
 def check_prices_present(day):
@@ -28,10 +26,10 @@ def check_prices_present(day):
         f"""
         SELECT DISTINCT pos.symbol
         FROM ({POSITIONS_AS_OF}) AS pos
-        LEFT JOIN daily_prices p ON p.symbol = pos.symbol AND p.price_date = :day
+        LEFT JOIN daily_prices p ON p.symbol = pos.symbol AND p.price_date = %(day)s
         WHERE p.symbol IS NULL
         """,
-        {"day": day.isoformat()},
+        {"day": day},
     )
     return CheckResult(
         "prices_present", "error", not missing,
@@ -48,12 +46,12 @@ def check_price_moves(day, threshold=0.5):
             SELECT symbol, price_date, close,
                    LAG(close) OVER (PARTITION BY symbol ORDER BY price_date) AS prev_close
             FROM daily_prices
-        )
-        WHERE price_date = ?
+        ) AS moves
+        WHERE price_date = %s
           AND prev_close IS NOT NULL
-          AND ABS(close - prev_close) / prev_close > ?
+          AND ABS(close - prev_close) / prev_close > %s
         """,
-        (day.isoformat(), threshold),
+        (day, threshold),
     )
     return CheckResult(
         "price_moves", "warn", not jumps,
@@ -67,10 +65,10 @@ def check_snapshot_complete(day):
         f"""
         SELECT
           (SELECT COUNT(*) FROM transactions),
-          (SELECT COUNT(*) FROM ({POSITIONS_AS_OF})),
-          (SELECT COUNT(*) FROM portfolio_snapshots WHERE snapshot_date = :day)
+          (SELECT COUNT(*) FROM ({POSITIONS_AS_OF}) AS pos),
+          (SELECT COUNT(*) FROM portfolio_snapshots WHERE snapshot_date = %(day)s)
         """,
-        {"day": day.isoformat()},
+        {"day": day},
     )[0]
     return CheckResult(
         "snapshot_complete", "error", trades > 0 and held == snapped,
@@ -103,7 +101,8 @@ def check_holdings_match_ledger():
         FROM holdings h
         LEFT JOIN transactions t ON UPPER(TRIM(t.symbol)) = h.symbol
         GROUP BY h.symbol, h.total_quantity
-        HAVING ABS(h.total_quantity - ledger_qty) > 1e-9
+        HAVING ABS(h.total_quantity
+                   - COALESCE(SUM(CASE t.side WHEN 'BUY' THEN t.quantity ELSE -t.quantity END), 0)) > 1e-9
         """
     )
     return CheckResult(
