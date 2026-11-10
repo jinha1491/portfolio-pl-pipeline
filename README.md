@@ -1,6 +1,6 @@
 # Portfolio P/L Pipeline
 
-Tracks positions and P/L for multiple traders. An Airflow DAG loads trade files and daily closing prices into Postgres, rebuilds FIFO lots, and snapshots positions every weekday. dbt builds the analytics tables, and there's a Streamlit app on top.
+Tracks positions and P/L for multiple traders. An Airflow DAG loads trade files and daily closing prices into Postgres, rebuilds FIFO lots, and snapshots positions every weekday. dbt builds the analytics tables in Postgres and, optionally, in Snowflake. There's a Streamlit app on top.
 
 ## Pipeline
 
@@ -8,8 +8,8 @@ Tracks positions and P/L for multiple traders. An Airflow DAG loads trade files 
 
 ~~~
 ingest_files ──> extract_prices ──> load_prices ──> validate_prices ──┐
-     │                                                                ├──> snapshot ──> validate_outputs ──> dbt_build
-     └──────────────────────────> rebuild_lots ───────────────────────┘
+     │                                                                ├──> snapshot ──> validate_outputs ──┬──> dbt_build
+     └──────────────────────────> rebuild_lots ───────────────────────┘                                     └──> sync_to_snowflake ──> dbt_build_snowflake
 ~~~
 
 | task | |
@@ -21,7 +21,9 @@ ingest_files ──> extract_prices ──> load_prices ──> validate_prices 
 | `rebuild_lots` | rebuild FIFO lots and realized P/L from the full ledger in one transaction |
 | `snapshot` | positions as of the run date, valued at that day's close |
 | `validate_outputs` | snapshot completeness, repeated trades, holdings vs. ledger |
-| `dbt_build` | build and test the dbt models |
+| `dbt_build` | build and test the dbt models in Postgres |
+| `sync_to_snowflake` | copy the raw tables dbt reads into Snowflake (full refresh, row counts checked); skipped if Snowflake isn't configured |
+| `dbt_build_snowflake` | build and test the same models in Snowflake |
 
 All tasks are safe to rerun for the same day. I backfilled a year of history (253 trading days) through Airflow.
 
@@ -57,6 +59,8 @@ source airflow_env.sh
 airflow standalone          # localhost:8080
 streamlit run app.py
 ~~~
+
+Snowflake is optional. Run `snowflake/setup.sql` once in a worksheet (it creates a warehouse, database, role, and a key-pair service user), copy `snowflake_env.example.sh` to `snowflake_env.sh`, fill in your account, and `source` it before starting Airflow. Without it, the two Snowflake tasks skip.
 
 Sample files are in `sample_data/`. Drop them into `data/inbox/holdings/` and `data/inbox/transactions/`, or upload them in the app.
 
