@@ -1,4 +1,4 @@
-# Stock Portfolio Data Pipeline
+# Portfolio P/L Pipeline
 
 Tracks positions and P/L for multiple traders. An Airflow DAG loads trade files and daily closing prices into Postgres, rebuilds FIFO lots, and snapshots positions every weekday. dbt builds the analytics tables, and there's a Streamlit app on top.
 
