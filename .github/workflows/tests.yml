@@ -28,3 +28,11 @@ jobs:
       - run: pip install -r requirements.txt pytest
       - run: pip install -e .
       - run: pytest -q
+      - name: Build dbt models against sample data
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/portfolio_test
+          PGDATABASE: portfolio_test
+        run: |
+          pip install -r requirements-dbt.txt
+          python scripts/load_sample.py
+          dbt build --project-dir dbt --profiles-dir dbt

@@ -1,0 +1,67 @@
+version: 2
+
+models:
+  - name: stg_transactions
+    columns:
+      - name: transaction_id
+        data_tests: [unique, not_null]
+      - name: person
+        data_tests: [not_null]
+      - name: side
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["BUY", "SELL"]
+
+  - name: stg_lots
+    columns:
+      - name: lot_id
+        data_tests: [unique, not_null]
+      - name: buy_transaction_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_transactions')
+                field: transaction_id
+
+  - name: stg_matches
+    columns:
+      - name: match_id
+        data_tests: [unique, not_null]
+      - name: term
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["SHORT", "LONG"]
+      - name: sell_transaction_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_transactions')
+                field: transaction_id
+      - name: buy_lot_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_lots')
+                field: lot_id
+
+  - name: fct_daily_portfolio_value
+    description: Total market value per trader per trading day.
+    columns:
+      - name: snapshot_date
+        data_tests: [not_null]
+      - name: person
+        data_tests: [not_null]
+      - name: market_value
+        data_tests: [not_null]
+
+  - name: fct_realized_pl
+    description: Realized P/L by trader, symbol, term, and month sold.
+
+  - name: fct_open_positions
+    description: Open positions with average cost, latest price, and unrealized P/L.
+    columns:
+      - name: latest_close
+        description: Null if the symbol has never been priced.
+        data_tests: [not_null]

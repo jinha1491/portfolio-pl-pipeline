@@ -1,4 +1,7 @@
+import os
+import subprocess
 from datetime import timedelta
+from pathlib import Path
 
 import pendulum
 from airflow.sdk import dag, get_current_context, task
@@ -7,6 +10,11 @@ from airflow.sdk.exceptions import AirflowSkipException
 from portfolio import prices, quality
 from portfolio.ingest import process_inbox
 from portfolio.fifo import rebuild_fifo
+
+ROOT = Path(__file__).resolve().parent.parent
+DBT_DIR = ROOT / "dbt"
+# dbt lives in its own virtualenv so its dependencies can't conflict with Airflow's.
+DBT_BIN = os.environ.get("DBT_BIN", str(ROOT / ".dbt-venv" / "bin" / "dbt"))
 
 
 def run_day():
@@ -65,6 +73,19 @@ def portfolio_daily():
     def validate_outputs():
         quality.enforce(quality.output_checks(run_day()))
 
+    @task(retries=0)
+    def dbt_build():
+        result = subprocess.run(
+            [DBT_BIN, "build", "--project-dir", str(DBT_DIR), "--profiles-dir", str(DBT_DIR)],
+            capture_output=True,
+            text=True,
+            env={**os.environ, "PGGSSENCMODE": "disable"},
+        )
+        print(result.stdout)
+        if result.returncode != 0:
+            print(result.stderr)
+            raise RuntimeError("dbt build failed, see the output above")
+
     ingested = ingest_files()
     closes = extract_prices()
     prices_ok = validate_prices()
@@ -73,7 +94,7 @@ def portfolio_daily():
     ingested >> closes
     load_prices(closes) >> prices_ok
     ingested >> lots
-    [prices_ok, lots] >> snapshot() >> validate_outputs()
+    [prices_ok, lots] >> snapshot() >> validate_outputs() >> dbt_build()
 
 
 portfolio_daily()

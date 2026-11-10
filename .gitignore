@@ -13,3 +13,9 @@ portfolio.db
 .DS_Store
 .airflow/
 data/
+
+# dbt
+.dbt-venv/
+dbt/target/
+dbt/logs/
+dbt/.user.yml
