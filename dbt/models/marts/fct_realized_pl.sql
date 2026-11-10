@@ -3,9 +3,9 @@ select
     person,
     symbol,
     term,
-    date_trunc('month', sell_date)::date as sell_month,
+    cast(date_trunc('month', sell_date) as date) as sell_month,
     count(*) as lots_matched,
-    round(sum(matched_qty)::numeric, 4) as shares_sold,
-    round(sum(realized_pl)::numeric, 2) as realized_pl
+    {{ round_to('sum(matched_qty)', 4) }} as shares_sold,
+    {{ round_to('sum(realized_pl)', 2) }} as realized_pl
 from {{ ref('stg_matches') }}
-group by person, symbol, term, date_trunc('month', sell_date)
+group by person, symbol, term, cast(date_trunc('month', sell_date) as date)

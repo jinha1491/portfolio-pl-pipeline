@@ -10,23 +10,29 @@ with open_lots as (
     group by person, symbol
 ),
 
-latest_price as (
-    select distinct on (symbol)
+ranked_prices as (
+    select
         symbol,
         price_date,
-        close
+        close,
+        row_number() over (partition by symbol order by price_date desc) as rn
     from {{ ref('stg_daily_prices') }}
-    order by symbol, price_date desc
+),
+
+latest_price as (
+    select symbol, price_date, close
+    from ranked_prices
+    where rn = 1
 )
 
 select
     o.person,
     o.symbol,
     o.quantity,
-    round((o.cost_basis / o.quantity)::numeric, 4) as avg_cost,
-    round(p.close::numeric, 2) as latest_close,
+    {{ round_to('o.cost_basis / o.quantity', 4) }} as avg_cost,
+    {{ round_to('p.close', 2) }} as latest_close,
     p.price_date as priced_on,
-    round((o.quantity * p.close)::numeric, 2) as market_value,
-    round((o.quantity * p.close - o.cost_basis)::numeric, 2) as unrealized_pl
+    {{ round_to('o.quantity * p.close', 2) }} as market_value,
+    {{ round_to('o.quantity * p.close - o.cost_basis', 2) }} as unrealized_pl
 from open_lots o
 left join latest_price p on p.symbol = o.symbol

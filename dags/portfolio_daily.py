@@ -7,7 +7,7 @@ import pendulum
 from airflow.sdk import dag, get_current_context, task
 from airflow.sdk.exceptions import AirflowSkipException
 
-from portfolio import prices, quality
+from portfolio import prices, quality, snowflake_sync
 from portfolio.ingest import process_inbox
 from portfolio.fifo import rebuild_fifo
 
@@ -15,6 +15,20 @@ ROOT = Path(__file__).resolve().parent.parent
 DBT_DIR = ROOT / "dbt"
 # dbt lives in its own virtualenv so its dependencies can't conflict with Airflow's.
 DBT_BIN = os.environ.get("DBT_BIN", str(ROOT / ".dbt-venv" / "bin" / "dbt"))
+
+
+def run_dbt(target):
+    result = subprocess.run(
+        [DBT_BIN, "build", "--project-dir", str(DBT_DIR), "--profiles-dir", str(DBT_DIR),
+         "--target", target],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PGGSSENCMODE": "disable"},
+    )
+    print(result.stdout)
+    if result.returncode != 0:
+        print(result.stderr)
+        raise RuntimeError(f"dbt build on {target} failed, see the output above")
 
 
 def run_day():
@@ -75,16 +89,20 @@ def portfolio_daily():
 
     @task(retries=0)
     def dbt_build():
-        result = subprocess.run(
-            [DBT_BIN, "build", "--project-dir", str(DBT_DIR), "--profiles-dir", str(DBT_DIR)],
-            capture_output=True,
-            text=True,
-            env={**os.environ, "PGGSSENCMODE": "disable"},
-        )
-        print(result.stdout)
-        if result.returncode != 0:
-            print(result.stderr)
-            raise RuntimeError("dbt build failed, see the output above")
+        run_dbt("dev")
+
+    @task
+    def sync_to_snowflake():
+        if not snowflake_sync.enabled():
+            raise AirflowSkipException("SNOWFLAKE_ACCOUNT not set, Snowflake is off")
+        counts = snowflake_sync.sync_tables()
+        for table, n in counts.items():
+            print(f"{table}: {n} rows")
+        return counts
+
+    @task(retries=0)
+    def dbt_build_snowflake():
+        run_dbt("snowflake")
 
     ingested = ingest_files()
     closes = extract_prices()
@@ -94,7 +112,10 @@ def portfolio_daily():
     ingested >> closes
     load_prices(closes) >> prices_ok
     ingested >> lots
-    [prices_ok, lots] >> snapshot() >> validate_outputs() >> dbt_build()
+    checked = validate_outputs()
+    [prices_ok, lots] >> snapshot() >> checked
+    checked >> dbt_build()
+    checked >> sync_to_snowflake() >> dbt_build_snowflake()
 
 
 portfolio_daily()

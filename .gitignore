@@ -19,3 +19,8 @@ data/
 dbt/target/
 dbt/logs/
 dbt/.user.yml
+
+# Snowflake credentials
+snowflake_env.sh
+*.p8
+*.pub

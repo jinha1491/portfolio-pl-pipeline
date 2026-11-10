@@ -8,14 +8,23 @@ with daily as (
         sum(market_value) as market_value
     from {{ ref('stg_portfolio_snapshots') }}
     group by snapshot_date, person
+),
+
+with_prev as (
+    select
+        snapshot_date,
+        person,
+        positions,
+        market_value,
+        lag(market_value) over (partition by person order by snapshot_date) as prev_value
+    from daily
 )
 
 select
     snapshot_date,
     person,
     positions,
-    round(market_value::numeric, 2) as market_value,
-    round((market_value - lag(market_value) over w)::numeric, 2) as change_from_prev_day,
-    round((market_value / nullif(lag(market_value) over w, 0) - 1)::numeric, 6) as pct_change_from_prev_day
-from daily
-window w as (partition by person order by snapshot_date)
+    {{ round_to('market_value', 2) }} as market_value,
+    {{ round_to('market_value - prev_value', 2) }} as change_from_prev_day,
+    {{ round_to('market_value / nullif(prev_value, 0) - 1', 6) }} as pct_change_from_prev_day
+from with_prev

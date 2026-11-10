@@ -10,3 +10,13 @@ portfolio:
       dbname: "{{ env_var('PGDATABASE', 'portfolio') }}"
       schema: analytics
       threads: 4
+    snowflake:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT', '') }}"
+      user: "{{ env_var('SNOWFLAKE_USER', '') }}"
+      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH', '') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'PORTFOLIO_ROLE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'PORTFOLIO_WH') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'PORTFOLIO') }}"
+      schema: analytics
+      threads: 4
