@@ -22,5 +22,6 @@ dbt/.user.yml
 
 # Snowflake credentials
 snowflake_env.sh
+bigquery_env.sh
 *.p8
 *.pub

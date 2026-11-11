@@ -1,6 +1,6 @@
 # Portfolio P/L Pipeline
 
-Tracks positions and P/L for multiple traders. An Airflow DAG loads trade files and daily closing prices into Postgres, rebuilds FIFO lots, and snapshots positions every weekday. dbt builds the analytics tables in Postgres and, optionally, in Snowflake. There's a Streamlit app on top.
+Tracks positions and P/L for multiple traders. An Airflow DAG loads trade files and daily closing prices into Postgres, rebuilds FIFO lots, and snapshots positions every weekday. dbt builds the analytics tables in Postgres and, optionally, in Snowflake and BigQuery. There's a Streamlit app on top.
 
 ## Pipeline
 
@@ -8,8 +8,11 @@ Tracks positions and P/L for multiple traders. An Airflow DAG loads trade files 
 
 ~~~
 ingest_files ──> extract_prices ──> load_prices ──> validate_prices ──┐
-     │                                                                ├──> snapshot ──> validate_outputs ──┬──> dbt_build
-     └──────────────────────────> rebuild_lots ───────────────────────┘                                     └──> sync_to_snowflake ──> dbt_build_snowflake
+     │                                                                ├──> snapshot ──> validate_outputs
+     └──────────────────────────> rebuild_lots ───────────────────────┘                         │
+                                                                                                ├──> dbt_build
+                                                                                                ├──> sync_to_snowflake ──> dbt_build_snowflake
+                                                                                                └──> sync_to_bigquery ──> dbt_build_bigquery
 ~~~
 
 | task | |
@@ -24,6 +27,8 @@ ingest_files ──> extract_prices ──> load_prices ──> validate_prices 
 | `dbt_build` | build and test the dbt models in Postgres |
 | `sync_to_snowflake` | copy the raw tables dbt reads into Snowflake (full refresh, row counts checked); skipped if Snowflake isn't configured |
 | `dbt_build_snowflake` | build and test the same models in Snowflake |
+| `sync_to_bigquery` | copy the same raw tables into BigQuery with load jobs (full refresh, row counts checked); skipped if BigQuery isn't configured |
+| `dbt_build_bigquery` | build and test the same models in BigQuery |
 
 All tasks are safe to rerun for the same day. I backfilled a year of history (253 trading days) through Airflow.
 
@@ -61,6 +66,8 @@ streamlit run app.py
 ~~~
 
 Snowflake is optional. Run `snowflake/setup.sql` once in a worksheet (it creates a warehouse, database, role, and a key-pair service user), copy `snowflake_env.example.sh` to `snowflake_env.sh`, fill in your account, and `source` it before starting Airflow. Without it, the two Snowflake tasks skip.
+
+BigQuery is optional too. Create a Google Cloud project (the free BigQuery sandbox works) and a service account with the BigQuery Data Editor and BigQuery Job User roles, download its JSON key, copy `bigquery_env.example.sh` to `bigquery_env.sh`, fill in your project and key path, and `source` it before starting Airflow. Without it, the two BigQuery tasks skip.
 
 Sample files are in `sample_data/`. Drop them into `data/inbox/holdings/` and `data/inbox/transactions/`, or upload them in the app.
 

@@ -7,7 +7,7 @@ import pendulum
 from airflow.sdk import dag, get_current_context, task
 from airflow.sdk.exceptions import AirflowSkipException
 
-from portfolio import prices, quality, snowflake_sync
+from portfolio import bigquery_sync, prices, quality, snowflake_sync
 from portfolio.ingest import process_inbox
 from portfolio.fifo import rebuild_fifo
 
@@ -104,6 +104,19 @@ def portfolio_daily():
     def dbt_build_snowflake():
         run_dbt("snowflake")
 
+    @task
+    def sync_to_bigquery():
+        if not bigquery_sync.enabled():
+            raise AirflowSkipException("BIGQUERY_PROJECT not set, BigQuery is off")
+        counts = bigquery_sync.sync_tables()
+        for table, n in counts.items():
+            print(f"{table}: {n} rows")
+        return counts
+
+    @task(retries=0)
+    def dbt_build_bigquery():
+        run_dbt("bigquery")
+
     ingested = ingest_files()
     closes = extract_prices()
     prices_ok = validate_prices()
@@ -116,6 +129,7 @@ def portfolio_daily():
     [prices_ok, lots] >> snapshot() >> checked
     checked >> dbt_build()
     checked >> sync_to_snowflake() >> dbt_build_snowflake()
+    checked >> sync_to_bigquery() >> dbt_build_bigquery()
 
 
 portfolio_daily()

@@ -3,14 +3,15 @@ version: 2
 sources:
   - name: raw
     description: Tables written by the Python pipeline.
-    # The pipeline writes to Postgres's public schema; the Snowflake sync copies into RAW.
-    schema: "{{ 'raw' if target.type == 'snowflake' else 'public' }}"
+    # The pipeline writes to Postgres's public schema; the Snowflake and BigQuery syncs copy into raw.
+    schema: "{{ 'raw' if target.type in ('snowflake', 'bigquery') else 'public' }}"
     tables:
       - name: transactions
       - name: lots
       - name: matches
       - name: daily_prices
-        loaded_at_field: loaded_at
-        freshness:
-          warn_after: {count: 4, period: day}
+        config:
+          loaded_at_field: loaded_at
+          freshness:
+            warn_after: {count: 4, period: day}
       - name: portfolio_snapshots

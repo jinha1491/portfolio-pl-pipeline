@@ -20,3 +20,11 @@ portfolio:
       database: "{{ env_var('SNOWFLAKE_DATABASE', 'PORTFOLIO') }}"
       schema: analytics
       threads: 4
+    bigquery:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('BIGQUERY_PROJECT', '') }}"
+      keyfile: "{{ env_var('BIGQUERY_KEYFILE', '') }}"
+      dataset: analytics
+      location: "{{ env_var('BIGQUERY_LOCATION', 'US') }}"
+      threads: 4
